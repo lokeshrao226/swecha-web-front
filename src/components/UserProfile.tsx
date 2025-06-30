@@ -6,14 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { User, Phone, Mail, MapPin, Calendar, Camera, Eye, EyeOff, LogOut, Edit, ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { toast } from "sonner";
 
-interface ExportData {
+interface UserData {
   task_id: string;
   task_name: string;
   status: string;
   message: string;
 }
 
-interface ProfileData {
+interface UserProfileData {
   user_id: string;
   username: string;
   name?: string;
@@ -25,7 +25,7 @@ interface ProfileData {
   [key: string]: any;
 }
 
-interface DailyStats {
+interface DailyReportData {
   total_uploads: number;
   videos_uploaded: number;
   images_uploaded: number;
@@ -37,42 +37,65 @@ interface DailyStats {
 }
 
 interface UserProfileProps {
-  user: any;
+  user: UserProfileData;
   token: string;
   onLogout: () => void;
   onBack: () => void;
 }
 
 const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack }) => {
-  const [showSensitive, setShowSensitive] = useState(false);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
-  const [exportData, setExportData] = useState<ExportData | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorState, setErrorState] = useState<string | null>(null);
+  const [showSensitive, setShowSensitive] = useState<boolean>(false);
+  const [profileData, setProfileData] = useState<UserProfileData | null>(null);
+  const [dailyStats, setDailyStats] = useState<DailyReportData | null>(null);
+  const [exportData, setExportData] = useState<UserData | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUserProfile();
     fetchDailyReports();
   }, [token]);
 
-};
-
-  const fetchDailyReports = async () => {
+  const fetchUserProfile = async (): Promise<void> => {
     try {
-      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
-        method: 'POST',
+      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/user', {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({})
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: UserProfileData = await response.json();
+        setProfileData(data);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.detail || "Failed to fetch user profile");
+        toast.error(errorData.detail || "Failed to fetch user profile");
+      }
+    } catch (error) {
+      console.error('Profile fetch error:', error);
+      setError("Network error. Please try again.");
+      toast.error("Network error. Please try again.");
+    }
+  };
+
+  const fetchDailyReports = async (): Promise<void> => {
+    try {
+      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data: DailyReportData = await response.json();
         setDailyStats(data);
       } else {
         const errorData = await response.json();
@@ -87,7 +110,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     }
   };
 
-  const handleExportData = async () => {
+  const handleExportData = async (): Promise<void> => {
     setIsExporting(true);
     try {
       const response = await fetch('https://backend2.swecha.org/api/v1/tasks/export-data?export_format=json', {
@@ -101,7 +124,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
       });
 
       if (response.ok) {
-        const data = await response.json() as UserData;
+        const data: UserData = await response.json();
         setExportData(data);
         toast.success("Data export initiated successfully");
         console.log('Export Data:', data);
@@ -116,20 +139,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     setIsExporting(false);
   };
 
-  const formatPhoneNumber = (phone: string) => {
+  const formatPhoneNumber = (phone: string): string => {
     if (!phone) return '';
     if (showSensitive) return phone;
     return phone.replace(/(\d{3})\d{6}(\d{2})/, '$1******$2');
   };
 
-  const formatEmail = (email: string) => {
+  const formatEmail = (email: string): string => {
     if (!email) return '';
     if (showSensitive) return email;
     const [local, domain] = email.split('@');
     return `${local.slice(0, 2)}****@${domain}`;
   };
 
-  const formatStorageSize = (bytes: number) => {
+  const formatStorageSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -137,12 +160,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
   };
 
-  const getUserInitials = (name: string, username: string) => {
+  const getUserInitials = (name?: string, username?: string): string => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     }
@@ -160,11 +183,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     );
   }
 
-  if (errorState && !profileData) {
+  if (error && !profileData) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{errorState}</p>
+          <p className="text-red-600 mb-4">{error}</p>
           <Button onClick={() => window.location.reload()}>Retry</Button>
         </div>
       </div>
@@ -178,7 +201,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white">
       {/* Header */}
-      <div className="gradient-purple text-white p-6">
+      <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <Button
@@ -213,7 +236,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
 
       <div className="px-6 -mt-6">
         {/* Profile Card */}
-        <Card className="animate-scale-in">
+        <Card className="transform transition-all duration-300 hover:scale-105">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="relative">
@@ -229,7 +252,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
                 </Avatar>
                 <Button
                   size="icon"
-                  className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full gradient-purple"
+                  className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900"
                 >
                   <Camera className="h-4 w-4" />
                 </Button>
@@ -392,7 +415,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
               <Button 
                 onClick={handleExportData}
                 disabled={isExporting}
-                className="w-full gradient-purple text-white hover:opacity-90"
+                className="w-full bg-gradient-to-r from-purple-600 to-purple-800 text-white hover:from-purple-700 hover:to-purple-900"
               >
                 <Download className="h-4 w-4 mr-2" />
                 {isExporting ? "Exporting..." : "Export My Data"}

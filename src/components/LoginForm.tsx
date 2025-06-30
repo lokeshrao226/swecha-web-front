@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Phone, MessageSquare, Eye, EyeOff } from 'lucide-react';
+import { Phone, MessageSquare, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { toast } from "sonner";
 
 interface LoginFormProps {
@@ -27,22 +27,22 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     
     setLoading(true);
     try {
-      const response = await fetch('https://backend2.swecha.org/users/login', {
+      const response = await fetch('https://backend2.swecha.org/api/v1/auth/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone_number: phoneNumber,
-          login_method: 'otp'
+          phone: phoneNumber
         }),
       });
 
+      const data = await response.json();
       if (response.ok) {
         setShowOtpInput(true);
         toast.success("OTP sent successfully!");
       } else {
-        toast.error("Failed to send OTP");
+        toast.error(data.message || data.detail || "Failed to send OTP");
       }
     } catch (error) {
       toast.error("Network error. Please try again.");
@@ -58,13 +58,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://backend2.swecha.org/users/verify-otp', {
+      const response = await fetch('https://backend2.swecha.org/api/v1/auth/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone_number: phoneNumber,
+          phone: phoneNumber,
           otp: otp
         }),
       });
@@ -72,9 +72,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       const data = await response.json();
       if (response.ok) {
         toast.success("Login successful!");
-        onLoginSuccess(data.access_token, data.user);
+        onLoginSuccess(data.access_token, data.user || { phone: phoneNumber });
       } else {
-        toast.error(data.detail || "Invalid OTP");
+        toast.error(data.message || data.detail || "Invalid OTP");
       }
     } catch (error) {
       toast.error("Network error. Please try again.");
@@ -90,24 +90,23 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://backend2.swecha.org/users/login', {
+      const response = await fetch('https://backend2.swecha.org/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone_number: phoneNumber,
-          password: password,
-          login_method: 'password'
+          phone: phoneNumber,
+          password: password
         }),
       });
 
       const data = await response.json();
       if (response.ok) {
         toast.success("Login successful!");
-        onLoginSuccess(data.access_token, data.user);
+        onLoginSuccess(data.access_token, data.user || { phone: phoneNumber });
       } else {
-        toast.error(data.detail || "Invalid credentials");
+        toast.error(data.message || data.detail || "Invalid credentials");
       }
     } catch (error) {
       toast.error("Network error. Please try again.");
@@ -116,22 +115,32 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 gradient-purple">
-      <Card className="w-full max-w-md animate-scale-in">
-        <CardHeader className="text-center pb-8">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-3xl gradient-purple flex items-center justify-center">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center">
-              <div className="w-8 h-8 gradient-purple rounded-xl"></div>
-            </div>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-700">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-1/2 -right-1/2 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-1/2 -left-1/2 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
+      </div>
+      
+      <Card className="w-full max-w-md animate-scale-in relative z-10 shadow-2xl border-0 bg-white/95 backdrop-blur-lg">
+        <CardHeader className="text-center pb-8 pt-8">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl gradient-purple flex items-center justify-center shadow-xl">
+            <Sparkles className="w-12 h-12 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">LOGIN</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome</h1>
+          <p className="text-gray-600">Sign in to your account</p>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          <div className="flex gap-2">
+        <CardContent className="space-y-6 px-8 pb-8">
+          {/* Login Method Toggle */}
+          <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
             <Button
-              variant={loginMethod === 'otp' ? 'default' : 'outline'}
-              className={`flex-1 ${loginMethod === 'otp' ? 'gradient-purple text-white' : ''}`}
+              variant={loginMethod === 'otp' ? 'default' : 'ghost'}
+              className={`flex-1 rounded-lg transition-all duration-300 ${
+                loginMethod === 'otp' 
+                  ? 'gradient-purple text-white shadow-lg' 
+                  : 'hover:bg-gray-200 text-gray-700'
+              }`}
               onClick={() => {
                 setLoginMethod('otp');
                 setShowOtpInput(false);
@@ -141,94 +150,118 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               Login with OTP
             </Button>
             <Button
-              variant={loginMethod === 'password' ? 'default' : 'outline'}
-              className={`flex-1 ${loginMethod === 'password' ? 'gradient-purple text-white' : ''}`}
+              variant={loginMethod === 'password' ? 'default' : 'ghost'}
+              className={`flex-1 rounded-lg transition-all duration-300 ${
+                loginMethod === 'password' 
+                  ? 'gradient-purple text-white shadow-lg' 
+                  : 'hover:bg-gray-200 text-gray-700'
+              }`}
               onClick={() => setLoginMethod('password')}
             >
               Login with Password
             </Button>
           </div>
 
+          {/* OTP Login Flow */}
           {loginMethod === 'otp' && !showOtpInput && (
-            <div className="space-y-4 animate-fade-in-up">
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <p className="text-sm text-purple-700">
-                  ℹ️ Enter your registered phone number to receive OTP
+            <div className="space-y-5 animate-fade-in-up">
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                <p className="text-sm text-blue-700 flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Enter your registered phone number to receive OTP
                 </p>
               </div>
               
               <div className="relative">
-                <Phone className="absolute left-3 top-3 h-5 w-5 text-purple-500" />
+                <Phone className="absolute left-4 top-4 h-5 w-5 text-purple-500" />
                 <Input
                   type="tel"
                   placeholder="Enter your phone number"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="pl-10 h-12 border-purple-200 focus:border-purple-500"
+                  className="pl-12 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
                 />
               </div>
 
               <Button
                 onClick={handleSendOTP}
                 disabled={loading}
-                className="w-full h-12 gradient-purple text-white hover:opacity-90 transition-opacity"
+                className="w-full h-14 gradient-purple text-white hover:opacity-90 transition-all duration-300 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl"
               >
-                {loading ? "Sending..." : "Send OTP"}
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Sending...
+                  </div>
+                ) : (
+                  "Send OTP"
+                )}
               </Button>
             </div>
           )}
 
+          {/* OTP Verification */}
           {loginMethod === 'otp' && showOtpInput && (
-            <div className="space-y-4 animate-fade-in-up">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-green-700">
-                  ✓ OTP sent to {phoneNumber}
+            <div className="space-y-5 animate-fade-in-up">
+              <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+                <p className="text-sm text-green-700 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  OTP sent to {phoneNumber}
                 </p>
               </div>
               
               <div className="relative">
-                <MessageSquare className="absolute left-3 top-3 h-5 w-5 text-purple-500" />
                 <Input
                   type="text"
-                  placeholder="Enter OTP"
+                  placeholder="Enter 6-digit OTP"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
-                  className="pl-10 h-12 border-purple-200 focus:border-purple-500 text-center text-lg tracking-widest"
+                  className="h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-center text-2xl tracking-widest bg-gray-50 focus:bg-white transition-all duration-300"
                   maxLength={6}
                 />
               </div>
 
-              <Button
-                onClick={handleVerifyOTP}
-                disabled={loading}
-                className="w-full h-12 gradient-purple text-white hover:opacity-90 transition-opacity"
-              >
-                {loading ? "Verifying..." : "Verify OTP"}
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  onClick={handleVerifyOTP}
+                  disabled={loading}
+                  className="w-full h-14 gradient-purple text-white hover:opacity-90 transition-all duration-300 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl"
+                >
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Verifying...
+                    </div>
+                  ) : (
+                    "Verify OTP"
+                  )}
+                </Button>
 
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowOtpInput(false);
-                  setOtp('');
-                }}
-                className="w-full text-purple-600"
-              >
-                Back to phone number
-              </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowOtpInput(false);
+                    setOtp('');
+                  }}
+                  className="w-full text-purple-600 hover:bg-purple-50 rounded-xl h-12 transition-all duration-300"
+                >
+                  Back to phone number
+                </Button>
+              </div>
             </div>
           )}
 
+          {/* Password Login */}
           {loginMethod === 'password' && (
-            <div className="space-y-4 animate-fade-in-up">
+            <div className="space-y-5 animate-fade-in-up">
               <div className="relative">
-                <Phone className="absolute left-3 top-3 h-5 w-5 text-purple-500" />
+                <Phone className="absolute left-4 top-4 h-5 w-5 text-purple-500 z-10" />
                 <Input
                   type="tel"
                   placeholder="Enter your phone number"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="pl-10 h-12 border-purple-200 focus:border-purple-500"
+                  className="pl-12 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
                 />
               </div>
 
@@ -238,23 +271,30 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10 h-12 border-purple-200 focus:border-purple-500"
+                  className="pr-12 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 h-5 w-5 text-purple-500"
+                  className="absolute right-4 top-4 h-6 w-6 text-purple-500 hover:text-purple-700 transition-colors duration-200"
                 >
-                  {showPassword ? <EyeOff /> : <Eye />}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
 
               <Button
                 onClick={handlePasswordLogin}
                 disabled={loading}
-                className="w-full h-12 gradient-purple text-white hover:opacity-90 transition-opacity"
+                className="w-full h-14 gradient-purple text-white hover:opacity-90 transition-all duration-300 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl"
               >
-                {loading ? "Logging in..." : "Login"}
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Logging in...
+                  </div>
+                ) : (
+                  "Login"
+                )}
               </Button>
             </div>
           )}

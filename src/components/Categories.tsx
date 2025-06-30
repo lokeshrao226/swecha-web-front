@@ -44,6 +44,9 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   const [uploading, setUploading] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [locationRequested, setLocationRequested] = useState(false);
+  const [showManualLocation, setShowManualLocation] = useState(false);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
 
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -51,7 +54,10 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playbackVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const recordingInterval = useRef<NodeJS.Timeout | null>(null);
 
@@ -91,7 +97,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   }, []);
 
   useEffect(() => {
-    if (recordingTime > 0 && isRecording) {
+    if (isRecording) {
       recordingInterval.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
@@ -106,7 +112,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         clearInterval(recordingInterval.current);
       }
     };
-  }, [isRecording, recordingTime]);
+  }, [isRecording]);
 
   const fetchCategories = async () => {
     try {
@@ -169,7 +175,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   const handleUploadOptionSelect = (option: UploadOption) => {
     setUploadMode(option.type);
     setShowUploadOptions(false);
-    if (!locationRequested) {
+    if (!locationRequested && !location) {
       requestLocation();
     }
   };
@@ -181,10 +187,10 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     if (!navigator.geolocation) {
       setLocationError('Geolocation is not supported by this browser.');
       toast.error("Geolocation not supported");
+      setShowManualLocation(true);
       return;
     }
 
-    // Show loading state
     toast.info("Requesting location access...");
 
     navigator.geolocation.getCurrentPosition(
@@ -195,6 +201,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
           lng: position.coords.longitude
         });
         setLocationError('');
+        setShowManualLocation(false);
         toast.success("Location access granted!");
       },
       (error) => {
@@ -203,7 +210,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         
         switch(error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage += 'Please allow location access and try again.';
+            errorMessage += 'Please allow location access or enter manually.';
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage += 'Location information is unavailable.';
@@ -218,6 +225,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         
         setLocationError(errorMessage);
         toast.error(errorMessage);
+        setShowManualLocation(true);
       },
       {
         enableHighAccuracy: true,
@@ -225,6 +233,31 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         maximumAge: 60000
       }
     );
+  };
+
+  const handleManualLocationSubmit = () => {
+    const lat = parseFloat(manualLat);
+    const lng = parseFloat(manualLng);
+    
+    if (isNaN(lat) || isNaN(lng)) {
+      toast.error("Please enter valid latitude and longitude values");
+      return;
+    }
+    
+    if (lat < -90 || lat > 90) {
+      toast.error("Latitude must be between -90 and 90");
+      return;
+    }
+    
+    if (lng < -180 || lng > 180) {
+      toast.error("Longitude must be between -180 and 180");
+      return;
+    }
+    
+    setLocation({ lat, lng });
+    setLocationError('');
+    setShowManualLocation(false);
+    toast.success("Location set manually!");
   };
 
   const startRecording = async (type: 'audio' | 'video') => {
@@ -257,6 +290,14 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         setSelectedFile(new File([blob], `recorded-${type}.webm`, { 
           type: blob.type 
         }));
+        
+        // Create URL for playback
+        const url = URL.createObjectURL(blob);
+        if (type === 'audio') {
+          setAudioUrl(url);
+        } else {
+          setVideoUrl(url);
+        }
       };
 
       recorder.start();
@@ -294,7 +335,6 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         videoRef.current.srcObject = mediaStream;
         videoRef.current.play();
 
-        // Wait for video to be ready
         videoRef.current.onloadedmetadata = () => {
           const canvas = canvasRef.current!;
           const video = videoRef.current!;
@@ -312,7 +352,6 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
             }
           }, 'image/jpeg', 0.9);
           
-          // Stop the stream
           mediaStream.getTracks().forEach(track => track.stop());
         };
       }
@@ -327,6 +366,8 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     if (file) {
       setSelectedFile(file);
       setRecordedBlob(null);
+      setAudioUrl(null);
+      setVideoUrl(null);
     }
   };
 
@@ -336,6 +377,16 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const resetRecording = () => {
+    setRecordedBlob(null);
+    setSelectedFile(null);
+    setRecordingTime(0);
+    setAudioUrl(null);
+    setVideoUrl(null);
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  };
+
   const handleUpload = async () => {
     if (!selectedCategory || !title.trim()) {
       toast.error("Please provide a title");
@@ -343,8 +394,10 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     }
 
     if (!location) {
-      toast.error("Location is required. Please enable location access.");
-      requestLocation();
+      toast.error("Location is required. Please enable location access or enter manually.");
+      if (!showManualLocation) {
+        setShowManualLocation(true);
+      }
       return;
     }
 
@@ -420,10 +473,13 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   };
 
   const handleBack = () => {
-    // Stop any ongoing recording
     if (isRecording) {
       stopRecording();
     }
+    
+    // Clean up URLs
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
     
     setSelectedCategory(null);
     setShowUploadOptions(false);
@@ -434,6 +490,13 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     setRecordedBlob(null);
     setRecordingTime(0);
     setLocationRequested(false);
+    setLocation(null);
+    setLocationError('');
+    setShowManualLocation(false);
+    setManualLat('');
+    setManualLng('');
+    setAudioUrl(null);
+    setVideoUrl(null);
   };
 
   if (loading) {
@@ -497,32 +560,89 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               </div>
 
               {/* Location Status */}
-              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                <MapPin className="h-5 w-5 text-gray-600" />
-                <span className="text-sm text-gray-600 flex-1">
-                  {location ? (
-                    <span className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Location captured ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})
-                    </span>
-                  ) : locationError ? (
-                    <span className="flex items-center gap-2 text-red-600">
-                      <AlertCircle className="h-4 w-4" />
-                      {locationError}
-                    </span>
-                  ) : (
-                    "Requesting location..."
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                  <MapPin className="h-5 w-5 text-gray-600" />
+                  <span className="text-sm text-gray-600 flex-1">
+                    {location ? (
+                      <span className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-500" />
+                        Location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                      </span>
+                    ) : locationError ? (
+                      <span className="flex items-center gap-2 text-red-600">
+                        <AlertCircle className="h-4 w-4" />
+                        {locationError}
+                      </span>
+                    ) : (
+                      "Location required"
+                    )}
+                  </span>
+                  {!location && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={requestLocation}
+                      >
+                        Get Location
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowManualLocation(!showManualLocation)}
+                      >
+                        Manual
+                      </Button>
+                    </div>
                   )}
-                </span>
-                {!location && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={requestLocation}
-                    disabled={!locationRequested && location === null}
-                  >
-                    {locationRequested ? 'Retry' : 'Get Location'}
-                  </Button>
+                </div>
+
+                {/* Manual Location Input */}
+                {showManualLocation && (
+                  <div className="p-4 border border-gray-200 rounded-lg bg-white">
+                    <h3 className="font-medium text-gray-700 mb-3">Enter Location Manually</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Latitude</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={manualLat}
+                          onChange={(e) => setManualLat(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                          placeholder="e.g., 17.3850"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Longitude</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={manualLng}
+                          onChange={(e) => setManualLng(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                          placeholder="e.g., 78.4867"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        onClick={handleManualLocationSubmit}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        Set Location
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowManualLocation(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -559,8 +679,11 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                     
                     {isRecording && (
                       <div className="text-center space-y-4">
-                        <div className="text-2xl font-bold text-red-500">
-                          {formatTime(recordingTime)}
+                        <div className="flex items-center justify-center gap-4">
+                          <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                          <div className="text-2xl font-bold text-red-500">
+                            {formatTime(recordingTime)}
+                          </div>
                         </div>
                         <Button
                           onClick={stopRecording}
@@ -572,22 +695,24 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                       </div>
                     )}
                     
-                    {recordedBlob && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                          <span className="text-sm text-green-700">Recording completed</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setRecordedBlob(null);
-                              setSelectedFile(null);
-                              setRecordingTime(0);
-                            }}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Record Again
-                          </Button>
+                    {recordedBlob && audioUrl && (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-green-50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-green-700">Recording completed ({formatTime(recordingTime)})</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={resetRecording}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Record Again
+                            </Button>
+                          </div>
+                          <audio controls className="w-full">
+                            <source src={audioUrl} type="audio/webm" />
+                            Your browser does not support the audio element.
+                          </audio>
                         </div>
                       </div>
                     )}
@@ -641,8 +766,11 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                     
                     {isRecording && (
                       <div className="text-center space-y-4">
-                        <div className="text-2xl font-bold text-red-500">
-                          {formatTime(recordingTime)}
+                        <div className="flex items-center justify-center gap-4">
+                          <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                          <div className="text-2xl font-bold text-red-500">
+                            {formatTime(recordingTime)}
+                          </div>
                         </div>
                         <Button
                           onClick={stopRecording}
@@ -654,22 +782,24 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                       </div>
                     )}
                     
-                    {recordedBlob && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                          <span className="text-sm text-green-700">Video recorded successfully</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setRecordedBlob(null);
-                              setSelectedFile(null);
-                              setRecordingTime(0);
-                            }}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Record Again
-                          </Button>
+                    {recordedBlob && videoUrl && (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-green-50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-green-700">Video recorded ({formatTime(recordingTime)})</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={resetRecording}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Record Again
+                            </Button>
+                          </div>
+                          <video controls className="w-full rounded-lg" style={{ maxHeight: '300px' }}>
+                            <source src={videoUrl} type="video/webm" />
+                            Your browser does not support the video element.
+                          </video>
                         </div>
                       </div>
                     )}
@@ -686,244 +816,4 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                       />
                       <label htmlFor="video-upload" className="cursor-pointer">
                         <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-600">
-                          {selectedFile && !recordedBlob ? selectedFile.name : 'Upload Video File'}
-                        </p>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {uploadMode === 'image' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Photo Capture *
-                  </label>
-                  <div className="space-y-4">
-                    <video
-                      ref={videoRef}
-                      className="w-full rounded-lg bg-black hidden"
-                      style={{ maxHeight: '300px' }}
-                    />
-                    <canvas ref={canvasRef} className="hidden" />
-                    
-                    <Button
-                      onClick={capturePhoto}
-                      className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg"
-                    >
-                      <Camera className="h-5 w-5 mr-2" />
-                      Capture Photo
-                    </Button>
-                    
-                    <div className="text-center text-sm text-gray-500">OR</div>
-                    
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        id="image-upload"
-                      />
-                      <label htmlFor="image-upload" className="cursor-pointer">
-                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-600">
-                          {selectedFile ? selectedFile.name : 'Upload Image File'}
-                        </p>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Upload Button */}
-              <Button
-                onClick={handleUpload}
-                disabled={uploading || !location || (!textContent.trim() && uploadMode === 'text') || (uploadMode !== 'text' && !selectedFile)}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
-              >
-                {uploading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Uploading...
-                  </div>
-                ) : (
-                  'Upload Content'
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Upload Options Screen
-  if (showUploadOptions && selectedCategory) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        {/* Header */}
-        <div className="gradient-purple text-white p-4 sm:p-6 rounded-b-3xl shadow-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-                onClick={handleBack}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold mb-1">Choose Input Method</h1>
-                <p className="text-purple-100 text-sm sm:text-lg">
-                  How would you like to share your content?
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Selected Category Display */}
-        <div className="px-4 sm:px-6 py-4">
-          <div className="flex justify-center">
-            <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center gap-3">
-              <div className="p-3 bg-purple-100 rounded-xl">
-                <Check className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Selected Category</p>
-                <p className="font-bold text-purple-600">{selectedCategory.title}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Upload Options Grid */}
-        <div className="px-4 sm:px-6 py-4">
-          <div className="max-w-md mx-auto">
-            <h2 className="text-lg font-bold text-gray-800 mb-4 text-center">
-              Select Input Method
-            </h2>
-            <p className="text-sm text-gray-600 mb-6 text-center">
-              Choose how you want to add your content
-            </p>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {uploadOptions.map((option) => (
-                <Card
-                  key={option.type}
-                  className="cursor-pointer shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all hover:scale-105 transform"
-                  onClick={() => handleUploadOptionSelect(option)}
-                >
-                  <CardContent className="p-6 text-center">
-                    <div className="p-4 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl w-fit mx-auto mb-4">
-                      <div className="text-purple-600">
-                        {option.icon}
-                      </div>
-                    </div>
-                    <h3 className="font-bold text-gray-800 mb-2">{option.title}</h3>
-                    <p className="text-sm text-gray-600">{option.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Main Categories Screen
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="gradient-purple text-white p-4 sm:p-6 rounded-b-3xl shadow-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-              onClick={onBack}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-1">Categories</h1>
-              <p className="text-purple-100 text-sm sm:text-lg">
-                Choose a category to share your content
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-              onClick={onProfile}
-            >
-              <User className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-              onClick={onLogout}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Categories Grid */}
-      <div className="px-4 sm:px-6 py-6 sm:py-8">
-        {categories.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Grid3X3 className="h-8 w-8 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Categories Available</h3>
-            <p className="text-gray-500">Categories will appear here once they are published.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {categories.map((category) => (
-              <Card
-                key={category.id}
-                className="cursor-pointer shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all hover:scale-105 transform bg-white"
-                onClick={() => handleCategoryClick(category)}
-              >
-                <CardContent className="p-6 text-center">
-                  <div className="text-4xl mb-4">
-                    {getCategoryIcon(category.name)}
-                  </div>
-                  <h3 className="font-bold text-gray-800 mb-2 text-lg">
-                    {category.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {category.description}
-                  </p>
-                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
-                    <Calendar className="h-3 w-3" />
-                    <span>
-                      {new Date(category.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default Categories;
+                        <p className="text-gray-600

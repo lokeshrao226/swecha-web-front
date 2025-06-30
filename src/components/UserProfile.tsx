@@ -1,17 +1,39 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { User, Phone, Mail, MapPin, Calendar, Camera, Eye, EyeOff, LogOut, Edit, ArrowLeft, Download } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Calendar, Camera, Eye, EyeOff, LogOut, Edit, ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { toast } from "sonner";
 
-interface UserData {
+interface ExportData {
   task_id: string;
   task_name: string;
   status: string;
   message: string;
+}
+
+interface ProfileData {
+  user_id: string;
+  username: string;
+  name?: string;
+  email?: string;
+  phone_number?: string;
+  created_at?: string;
+  profile_picture?: string;
+  location?: string;
+  [key: string]: any;
+}
+
+interface DailyStats {
+  total_uploads: number;
+  videos_uploaded: number;
+  images_uploaded: number;
+  audio_uploaded: number;
+  storage_used: number;
+  last_upload_date?: string;
+  active_days: number;
+  [key: string]: any;
 }
 
 interface UserProfileProps {
@@ -23,27 +45,45 @@ interface UserProfileProps {
 
 const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack }) => {
   const [showSensitive, setShowSensitive] = useState(false);
-  const [stats, setStats] = useState({
-    recordings: 0,
-    storageUsed: '0 B',
-    daysActive: 0
-  });
-  const [exportData, setExportData] = useState<UserData | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
+  const [exportData, setExportData] = useState<ExportData | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorState, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUserStats();
-  }, []);
+    fetchUserProfile();
+    fetchDailyReports();
+  }, [token]);
 
-  const fetchUserStats = async () => {
+};
+
+  const fetchDailyReports = async () => {
     try {
-      setStats({
-        recordings: Math.floor(Math.random() * 50),
-        storageUsed: `${(Math.random() * 5).toFixed(1)} GB`,
-        daysActive: Math.floor(Math.random() * 365)
+      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDailyStats(data);
+      } else {
+        const errorData = await response.json();
+        console.error('Daily stats error:', errorData);
+        toast.error(errorData.detail || "Failed to fetch daily statistics");
+      }
     } catch (error) {
-      console.error('Failed to fetch stats:', error);
+      console.error('Daily stats fetch error:', error);
+      toast.error("Failed to fetch daily statistics");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -89,6 +129,52 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     return `${local.slice(0, 2)}****@${domain}`;
   };
 
+  const formatStorageSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getUserInitials = (name: string, username: string) => {
+    if (name) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return username ? username.slice(0, 2).toUpperCase() : 'U';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorState && !profileData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{errorState}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentUser = profileData || user;
+  const displayName = currentUser?.name || currentUser?.username || 'User';
+  const memberSince = currentUser?.created_at ? new Date(currentUser.created_at).getFullYear() : new Date().getFullYear();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white">
       {/* Header */}
@@ -132,9 +218,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="relative">
                 <Avatar className="w-24 h-24">
-                  <AvatarImage src="" />
+                  <AvatarImage src={currentUser?.profile_picture || ""} />
                   <AvatarFallback className="bg-purple-100 text-purple-600 text-2xl">
-                    <User className="w-12 h-12" />
+                    {currentUser?.profile_picture ? (
+                      <User className="w-12 h-12" />
+                    ) : (
+                      getUserInitials(currentUser?.name, currentUser?.username)
+                    )}
                   </AvatarFallback>
                 </Avatar>
                 <Button
@@ -147,31 +237,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
 
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {user?.name || user?.username || 'User'}
+                  {displayName}
                 </h2>
+                {currentUser?.username && currentUser?.name && (
+                  <p className="text-gray-600">@{currentUser.username}</p>
+                )}
               </div>
 
               {/* Contact Information */}
               <div className="w-full space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Phone className="h-5 w-5 text-purple-500" />
-                    <span className="font-medium">{formatPhoneNumber(user?.phone_number)}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowSensitive(!showSensitive)}
-                  >
-                    {showSensitive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-
-                {user?.email && (
+                {currentUser?.phone_number && (
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
-                      <Mail className="h-5 w-5 text-purple-500" />
-                      <span className="font-medium">{formatEmail(user.email)}</span>
+                      <Phone className="h-5 w-5 text-purple-500" />
+                      <span className="font-medium">{formatPhoneNumber(currentUser.phone_number)}</span>
                     </div>
                     <Button
                       variant="ghost"
@@ -183,10 +262,28 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <MapPin className="h-5 w-5 text-purple-500" />
-                  <span className="text-gray-600">Location</span>
-                </div>
+                {currentUser?.email && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-5 w-5 text-purple-500" />
+                      <span className="font-medium">{formatEmail(currentUser.email)}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowSensitive(!showSensitive)}
+                    >
+                      {showSensitive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                )}
+
+                {currentUser?.location && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <MapPin className="h-5 w-5 text-purple-500" />
+                    <span className="text-gray-600">{currentUser.location}</span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-center gap-4 p-3">
                   <Badge variant="secondary" className="flex items-center gap-1">
@@ -195,41 +292,93 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
                   </Badge>
                   <Badge variant="outline" className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Member since {new Date().getFullYear()}
+                    Member since {memberSince}
                   </Badge>
                 </div>
               </div>
 
-              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-                Tap on phone or email to reveal
-              </p>
+              {(currentUser?.phone_number || currentUser?.email) && (
+                <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                  Tap the eye icon to reveal sensitive information
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-4 mt-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 mb-6">
           <Card className="text-center">
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold text-blue-500">{stats.recordings}</div>
-              <div className="text-sm text-gray-600">Recordings</div>
+              <div className="text-2xl font-bold text-blue-500">
+                {dailyStats?.total_uploads || 0}
+              </div>
+              <div className="text-sm text-gray-600">Total Uploads</div>
             </CardContent>
           </Card>
           
           <Card className="text-center">
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold text-green-500">{stats.storageUsed}</div>
+              <div className="text-2xl font-bold text-green-500">
+                {dailyStats?.videos_uploaded || 0}
+              </div>
+              <div className="text-sm text-gray-600">Videos</div>
+            </CardContent>
+          </Card>
+          
+          <Card className="text-center">
+            <CardContent className="pt-4">
+              <div className="text-2xl font-bold text-orange-500">
+                {dailyStats?.images_uploaded || 0}
+              </div>
+              <div className="text-sm text-gray-600">Images</div>
+            </CardContent>
+          </Card>
+
+          <Card className="text-center">
+            <CardContent className="pt-4">
+              <div className="text-2xl font-bold text-red-500">
+                {dailyStats?.audio_uploaded || 0}
+              </div>
+              <div className="text-sm text-gray-600">Audio</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Stats */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <Card className="text-center">
+            <CardContent className="pt-4">
+              <div className="text-2xl font-bold text-purple-500">
+                {dailyStats?.storage_used ? formatStorageSize(dailyStats.storage_used) : '0 B'}
+              </div>
               <div className="text-sm text-gray-600">Storage Used</div>
             </CardContent>
           </Card>
           
           <Card className="text-center">
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold text-red-500">{stats.daysActive}</div>
-              <div className="text-sm text-gray-600">Days Active</div>
+              <div className="text-2xl font-bold text-indigo-500">
+                {dailyStats?.active_days || 0}
+              </div>
+              <div className="text-sm text-gray-600">Active Days</div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Last Upload Info */}
+        {dailyStats?.last_upload_date && (
+          <Card className="mb-6">
+            <CardContent className="pt-4">
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Last Upload</p>
+                <p className="font-semibold text-gray-800">
+                  {formatDate(dailyStats.last_upload_date)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Data Export Section */}
         <Card className="mb-6">

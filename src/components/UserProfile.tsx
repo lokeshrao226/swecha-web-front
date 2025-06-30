@@ -47,7 +47,18 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     }
   };
 
-  
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/export-data?export_format=json', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: ''
+      });
 
       if (response.ok) {
         const data = await response.json() as UserData;

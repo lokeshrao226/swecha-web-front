@@ -814,4 +814,116 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               {uploadOptions.map((option) => (
                 <Card
                   key={option.type}
-                  className="cursor-pointer shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition
+                  className="cursor-pointer shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all hover:scale-105 transform"
+                  onClick={() => handleUploadOptionSelect(option)}
+                >
+                  <CardContent className="p-6 text-center">
+                    <div className="p-4 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl w-fit mx-auto mb-4">
+                      <div className="text-purple-600">
+                        {option.icon}
+                      </div>
+                    </div>
+                    <h3 className="font-bold text-gray-800 mb-2">{option.title}</h3>
+                    <p className="text-sm text-gray-600">{option.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Categories Screen
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header */}
+      <div className="gradient-purple text-white p-4 sm:p-6 rounded-b-3xl shadow-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
+              onClick={onBack}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-1">Categories</h1>
+              <p className="text-purple-100 text-sm sm:text-lg">
+                Choose a category to share your content
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
+              onClick={onProfile}
+            >
+              <User className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
+              onClick={onLogout}
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Categories Grid */}
+      <div className="px-4 sm:px-6 py-6 sm:py-8">
+        {categories.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Grid3X3 className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Categories Available</h3>
+            <p className="text-gray-500">Categories will appear here once they are published.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            {categories.map((category) => (
+              <Card
+                key={category.id}
+                className="cursor-pointer shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all hover:scale-105 transform bg-white"
+                onClick={() => handleCategoryClick(category)}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="text-4xl mb-4">
+                    {getCategoryIcon(category.name)}
+                  </div>
+                  <h3 className="font-bold text-gray-800 mb-2 text-lg">
+                    {category.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    {category.description}
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      {new Date(category.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Categories;

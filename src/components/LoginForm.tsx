@@ -147,9 +147,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       
       <Card className="w-full max-w-md animate-scale-in relative z-10 shadow-2xl border-0 bg-white/95 backdrop-blur-lg">
         <CardHeader className="text-center pb-8 pt-8">
-          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl gradient-purple flex items-center justify-center shadow-xl">
-            <Sparkles className="w-12 h-12 text-white" />
-          </div>
+          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl shadow-xl overflow-hidden">
+  <img
+    src="/public/favicon.png"
+    alt="Logo"
+    className="w-full h-full object-cover"
+  />
+</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome</h1>
           <p className="text-gray-600">Sign in to your account</p>
         </CardHeader>

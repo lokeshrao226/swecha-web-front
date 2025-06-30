@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,16 +11,31 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [loginMethod, setLoginMethod] = useState<'otp' | 'password'>('otp');
-  const [phone, setPhone] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    // Keep only the first 10 digits
+    return digits.slice(0, 10);
+  };
+
+  const getFullPhoneNumber = () => {
+    return `+91${phoneDigits}`;
+  };
+
+  const isValidPhoneNumber = () => {
+    return phoneDigits.length === 10;
+  };
+
   const handleSendOTP = async () => {
-    if (!phone) {
-      toast.error("Please enter your phone number");
+    if (!isValidPhoneNumber()) {
+      toast.error("Please enter a valid 10-digit phone number");
       return;
     }
     
@@ -33,7 +47,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: phone
+          phone_number: getFullPhoneNumber()
         }),
       });
 
@@ -67,7 +81,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: phone,
+          phone_number: getFullPhoneNumber(),
           otp: otp
         }),
       });
@@ -77,7 +91,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       
       if (response.ok) {
         toast.success("Login successful!");
-        onLoginSuccess(data.access_token, data.user || { phone: phone });
+        onLoginSuccess(data.access_token, data.user || { phone: getFullPhoneNumber() });
       } else {
         toast.error(data.message || data.detail || "Invalid OTP");
       }
@@ -89,8 +103,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   };
 
   const handlePasswordLogin = async () => {
-    if (!phone || !password) {
-      toast.error("Please enter both phone number and password");
+    if (!isValidPhoneNumber() || !password) {
+      toast.error("Please enter a valid phone number and password");
       return;
     }
 
@@ -102,7 +116,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: phone,
+          phone: getFullPhoneNumber(),
           password: password
         }),
       });
@@ -112,7 +126,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       
       if (response.ok) {
         toast.success("Login successful!");
-        onLoginSuccess(data.access_token, data.user || { phone: phone });
+        onLoginSuccess(data.access_token, data.user || { phone: getFullPhoneNumber() });
       } else {
         toast.error(data.message || data.detail || "Invalid credentials");
       }
@@ -183,18 +197,22 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               
               <div className="relative">
                 <Phone className="absolute left-4 top-4 h-5 w-5 text-purple-500" />
+                <div className="absolute left-12 top-4 text-gray-500 font-medium">+91</div>
                 <Input
                   type="tel"
-                  placeholder="Enter your phone number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="pl-12 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
+                  placeholder="Enter 10-digit phone number"
+                  value={phoneDigits}
+                  onChange={(e) => setPhoneDigits(formatPhoneNumber(e.target.value))}
+                  className="pl-20 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
                 />
+                <div className="text-xs text-gray-500 mt-1 ml-1">
+                  {phoneDigits.length}/10 digits
+                </div>
               </div>
 
               <Button
                 onClick={handleSendOTP}
-                disabled={loading}
+                disabled={loading || !isValidPhoneNumber()}
                 className="w-full h-14 gradient-purple text-white hover:opacity-90 transition-all duration-300 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl"
               >
                 {loading ? (
@@ -215,7 +233,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               <div className="bg-green-50 p-4 rounded-xl border border-green-200">
                 <p className="text-sm text-green-700 flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  OTP sent to {phone}
+                  OTP sent to +91{phoneDigits}
                 </p>
               </div>
               
@@ -265,13 +283,17 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             <div className="space-y-5 animate-fade-in-up">
               <div className="relative">
                 <Phone className="absolute left-4 top-4 h-5 w-5 text-purple-500 z-10" />
+                <div className="absolute left-12 top-4 text-gray-500 font-medium">+91</div>
                 <Input
                   type="tel"
-                  placeholder="Enter your phone number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="pl-12 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
+                  placeholder="Enter 10-digit phone number"
+                  value={phoneDigits}
+                  onChange={(e) => setPhoneDigits(formatPhoneNumber(e.target.value))}
+                  className="pl-20 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
                 />
+                <div className="text-xs text-gray-500 mt-1 ml-1">
+                  {phoneDigits.length}/10 digits
+                </div>
               </div>
 
               <div className="relative">
@@ -293,7 +315,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
               <Button
                 onClick={handlePasswordLogin}
-                disabled={loading}
+                disabled={loading || !isValidPhoneNumber()}
                 className="w-full h-14 gradient-purple text-white hover:opacity-90 transition-all duration-300 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl"
               >
                 {loading ? (

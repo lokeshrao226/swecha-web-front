@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import LoginForm from '@/components/LoginForm';
 import UserProfile from '@/components/UserProfile';
 import ContentInput from '@/components/ContentInput';
+import Categories from '@/components/Categories';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, User, Home, Activity } from 'lucide-react';
+import { Plus, User, Home, Activity, Grid3X3 } from 'lucide-react';
 
-type View = 'login' | 'home' | 'profile' | 'content';
+type View = 'login' | 'home' | 'profile' | 'content' | 'categories';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<View>('login');
@@ -22,7 +22,7 @@ const Index = () => {
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
-      setCurrentView('home');
+      setCurrentView('categories');
     }
   }, []);
 
@@ -31,7 +31,7 @@ const Index = () => {
     setUser(userData);
     localStorage.setItem('token', accessToken);
     localStorage.setItem('user', JSON.stringify(userData));
-    setCurrentView('home');
+    setCurrentView('categories');
   };
 
   const handleLogout = () => {
@@ -61,6 +61,16 @@ const Index = () => {
       <ContentInput 
         token={token!} 
         onBack={() => setCurrentView('home')}
+      />
+    );
+  }
+
+  if (currentView === 'categories') {
+    return (
+      <Categories 
+        token={token!} 
+        onBack={() => setCurrentView('home')}
+        onLogout={handleLogout}
       />
     );
   }
@@ -95,19 +105,18 @@ const Index = () => {
             <h2 className="text-xl font-bold text-gray-800 mb-6">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-4">
               <Button
+                onClick={() => setCurrentView('categories')}
+                className="h-24 flex-col gap-3 gradient-purple text-white hover:opacity-90 rounded-xl shadow-lg border-0 transition-all duration-300 hover:scale-105"
+              >
+                <Grid3X3 className="h-7 w-7" />
+                <span className="font-semibold">Categories</span>
+              </Button>
+              <Button
                 onClick={() => setCurrentView('content')}
                 className="h-24 flex-col gap-3 gradient-purple text-white hover:opacity-90 rounded-xl shadow-lg border-0 transition-all duration-300 hover:scale-105"
               >
                 <Plus className="h-7 w-7" />
                 <span className="font-semibold">Add Content</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-24 flex-col gap-3 border-2 border-purple-200 hover:border-purple-300 hover:bg-purple-50 rounded-xl shadow-lg transition-all duration-300 hover:scale-105"
-                onClick={() => setCurrentView('profile')}
-              >
-                <User className="h-7 w-7 text-purple-600" />
-                <span className="font-semibold text-purple-700">View Profile</span>
               </Button>
             </div>
           </CardContent>
@@ -126,7 +135,7 @@ const Index = () => {
               <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-100">
                 <div>
                   <p className="font-semibold text-gray-800">Welcome to the platform!</p>
-                  <p className="text-sm text-gray-600 mt-1">Get started by adding your first content</p>
+                  <p className="text-sm text-gray-600 mt-1">Get started by exploring categories</p>
                 </div>
                 <span className="text-xs text-purple-600 font-medium bg-purple-100 px-2 py-1 rounded-full">Now</span>
               </div>
@@ -148,6 +157,17 @@ const Index = () => {
             onClick={() => setCurrentView('home')}
           >
             <Home className="h-5 w-5" />
+          </Button>
+          <Button
+            variant={currentView === 'categories' ? 'default' : 'ghost'}
+            className={`w-12 h-12 rounded-full transition-all duration-300 ${
+              currentView === 'categories' 
+                ? 'gradient-purple text-white shadow-lg scale-110' 
+                : 'hover:bg-purple-50 text-purple-600'
+            }`}
+            onClick={() => setCurrentView('categories')}
+          >
+            <Grid3X3 className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"

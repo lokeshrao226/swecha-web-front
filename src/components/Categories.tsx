@@ -20,9 +20,11 @@ interface CategoriesProps {
   token: string;
   onBack: () => void;
   onLogout: () => void;
+  onProfile: () => void;
+  onContentInput: (categoryId: string, categoryName: string) => void;
 }
 
-const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout }) => {
+const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProfile, onContentInput }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,6 +86,10 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout }) => {
     return iconMap[name] || '📂';
   };
 
+  const handleCategoryClick = (category: Category) => {
+    onContentInput(category.id, category.title);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
@@ -108,17 +114,27 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout }) => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold mb-1">Categories</h1>
-              <p className="text-purple-100 text-lg">Explore content categories</p>
+              <p className="text-purple-100 text-lg">Select a category to add content</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-            onClick={onLogout}
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
+              onClick={onProfile}
+            >
+              <User className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
+              onClick={onLogout}
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -126,7 +142,11 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout }) => {
       <div className="px-6 -mt-4 pb-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
           {categories.map((category) => (
-            <Card key={category.id} className="animate-scale-in shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <Card 
+              key={category.id} 
+              className="animate-scale-in shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
+              onClick={() => handleCategoryClick(category)}
+            >
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
                   <div className="text-3xl">

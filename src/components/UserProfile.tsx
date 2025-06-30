@@ -4,31 +4,39 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { User, Phone, Mail, MapPin, Calendar, Camera, Eye, EyeOff, LogOut, Edit } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Calendar, Camera, Eye, EyeOff, LogOut, Edit, ArrowLeft, Download } from 'lucide-react';
 import { toast } from "sonner";
+
+interface UserData {
+  task_id: string;
+  task_name: string;
+  status: string;
+  message: string;
+}
 
 interface UserProfileProps {
   user: any;
   token: string;
   onLogout: () => void;
+  onBack: () => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack }) => {
   const [showSensitive, setShowSensitive] = useState(false);
   const [stats, setStats] = useState({
     recordings: 0,
     storageUsed: '0 B',
     daysActive: 0
   });
+  const [exportData, setExportData] = useState<UserData | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
-    // Fetch user stats
     fetchUserStats();
   }, []);
 
   const fetchUserStats = async () => {
     try {
-      // This would be replaced with actual API calls
       setStats({
         recordings: Math.floor(Math.random() * 50),
         storageUsed: `${(Math.random() * 5).toFixed(1)} GB`,
@@ -37,6 +45,35 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout }) => {
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/export-data?export_format=json', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: ''
+      });
+
+      if (response.ok) {
+        const data = await response.json() as UserData;
+        setExportData(data);
+        toast.success("Data export initiated successfully");
+        console.log('Export Data:', data);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || "Failed to export data");
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error("Network error. Please try again.");
+    }
+    setIsExporting(false);
   };
 
   const formatPhoneNumber = (phone: string) => {
@@ -57,7 +94,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout }) => {
       {/* Header */}
       <div className="gradient-purple text-white p-6">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Profile</h1>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+              onClick={onBack}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Profile</h1>
+          </div>
           <div className="flex gap-2">
             <Button
               variant="ghost"
@@ -183,6 +230,42 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout }) => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Data Export Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Data Export</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">Export your data in JSON format</p>
+              
+              <Button 
+                onClick={handleExportData}
+                disabled={isExporting}
+                className="w-full gradient-purple text-white hover:opacity-90"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isExporting ? "Exporting..." : "Export My Data"}
+              </Button>
+
+              {exportData && (
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-green-800 mb-2">Export Status</h4>
+                  <div className="space-y-1 text-sm">
+                    <p><span className="font-medium">Task ID:</span> {exportData.task_id}</p>
+                    <p><span className="font-medium">Status:</span> 
+                      <Badge className={exportData.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
+                        {exportData.status}
+                      </Badge>
+                    </p>
+                    <p><span className="font-medium">Message:</span> {exportData.message}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Settings Section */}
         <Card>

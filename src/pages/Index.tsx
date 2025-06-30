@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import LoginForm from '@/components/LoginForm';
 import UserProfile from '@/components/UserProfile';
@@ -52,6 +53,7 @@ const Index = () => {
         user={user} 
         token={token!} 
         onLogout={handleLogout}
+        onBack={() => setCurrentView('categories')}
       />
     );
   }
@@ -60,7 +62,7 @@ const Index = () => {
     return (
       <ContentInput 
         token={token!} 
-        onBack={() => setCurrentView('home')}
+        onBack={() => setCurrentView('categories')}
       />
     );
   }
@@ -71,6 +73,8 @@ const Index = () => {
         token={token!} 
         onBack={() => setCurrentView('home')}
         onLogout={handleLogout}
+        onProfile={() => setCurrentView('profile')}
+        onContentInput={() => setCurrentView('content')}
       />
     );
   }

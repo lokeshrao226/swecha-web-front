@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, LogOut, Grid3X3, Calendar, User, FileText, Upload, MapPin, Type, Mic, Video, Image, X, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, LogOut, Grid3X3, Calendar, User, FileText, Upload, MapPin, Type, Mic, Video, Image, X, Check, AlertCircle, Camera, Square, Play, Pause, RotateCcw } from 'lucide-react';
 import { toast } from "sonner";
 
 interface Category {
@@ -43,34 +43,45 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [uploading, setUploading] = useState(false);
   const [locationError, setLocationError] = useState('');
+  const [locationRequested, setLocationRequested] = useState(false);
+
+  // Recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const recordingInterval = useRef<NodeJS.Timeout | null>(null);
 
   const uploadOptions: UploadOption[] = [
     {
       type: 'text',
-      icon: <Type className="h-6 w-6" />,
-      title: 'Text Content',
-      description: 'Add written content, stories, or descriptions',
+      icon: <Type className="h-8 w-8" />,
+      title: 'Text Input',
+      description: 'Type your content',
       accept: ''
     },
     {
       type: 'audio',
-      icon: <Mic className="h-6 w-6" />,
+      icon: <Mic className="h-8 w-8" />,
       title: 'Audio Recording',
-      description: 'Upload audio files, songs, or voice recordings',
+      description: 'Record your voice',
       accept: 'audio/*'
     },
     {
       type: 'video',
-      icon: <Video className="h-6 w-6" />,
+      icon: <Video className="h-8 w-8" />,
       title: 'Video Content',
-      description: 'Share video recordings or visual stories',
+      description: 'Record or upload video',
       accept: 'video/*'
     },
     {
       type: 'image',
-      icon: <Image className="h-6 w-6" />,
-      title: 'Images & Photos',
-      description: 'Upload pictures, artwork, or visual content',
+      icon: <Camera className="h-8 w-8" />,
+      title: 'Photo Capture',
+      description: 'Take or upload photos',
       accept: 'image/*'
     }
   ];
@@ -78,6 +89,24 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (recordingTime > 0 && isRecording) {
+      recordingInterval.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (recordingInterval.current) {
+        clearInterval(recordingInterval.current);
+      }
+    }
+
+    return () => {
+      if (recordingInterval.current) {
+        clearInterval(recordingInterval.current);
+      }
+    };
+  }, [isRecording, recordingTime]);
 
   const fetchCategories = async () => {
     try {
@@ -91,7 +120,6 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
       if (response.ok) {
         const data = await response.json();
         console.log('Categories Response:', data);
-        // Filter only published categories and sort by rank
         const publishedCategories = data
           .filter((cat: Category) => cat.published)
           .sort((a: Category, b: Category) => a.rank - b.rank);
@@ -141,33 +169,156 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   const handleUploadOptionSelect = (option: UploadOption) => {
     setUploadMode(option.type);
     setShowUploadOptions(false);
-    requestLocation();
+    if (!locationRequested) {
+      requestLocation();
+    }
   };
 
   const requestLocation = () => {
     setLocationError('');
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error('Location error:', error);
-          setLocationError('Location access denied. Please enable location services and try again.');
-          toast.error("Location access is required for content upload");
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
-        }
-      );
-    } else {
+    setLocationRequested(true);
+    
+    if (!navigator.geolocation) {
       setLocationError('Geolocation is not supported by this browser.');
       toast.error("Geolocation not supported");
+      return;
+    }
+
+    // Show loading state
+    toast.info("Requesting location access...");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log('Location obtained:', position.coords);
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setLocationError('');
+        toast.success("Location access granted!");
+      },
+      (error) => {
+        console.error('Location error:', error);
+        let errorMessage = 'Location access failed. ';
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Please allow location access and try again.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'An unknown error occurred.';
+            break;
+        }
+        
+        setLocationError(errorMessage);
+        toast.error(errorMessage);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000
+      }
+    );
+  };
+
+  const startRecording = async (type: 'audio' | 'video') => {
+    try {
+      const constraints = type === 'audio' 
+        ? { audio: true }
+        : { audio: true, video: { facingMode: 'user' } };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      setStream(mediaStream);
+
+      if (type === 'video' && videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+
+      const recorder = new MediaRecorder(mediaStream);
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { 
+          type: type === 'audio' ? 'audio/webm' : 'video/webm' 
+        });
+        setRecordedBlob(blob);
+        setSelectedFile(new File([blob], `recorded-${type}.webm`, { 
+          type: blob.type 
+        }));
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      toast.success(`${type === 'audio' ? 'Audio' : 'Video'} recording started`);
+    } catch (error) {
+      console.error('Recording error:', error);
+      toast.error(`Failed to start ${type} recording. Please check permissions.`);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsRecording(false);
+    setMediaRecorder(null);
+    toast.success('Recording stopped');
+  };
+
+  const capturePhoto = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user' } 
+      });
+      
+      if (videoRef.current && canvasRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.play();
+
+        // Wait for video to be ready
+        videoRef.current.onloadedmetadata = () => {
+          const canvas = canvasRef.current!;
+          const video = videoRef.current!;
+          
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(video, 0, 0);
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              setSelectedFile(new File([blob], 'captured-photo.jpg', { type: 'image/jpeg' }));
+              toast.success('Photo captured!');
+            }
+          }, 'image/jpeg', 0.9);
+          
+          // Stop the stream
+          mediaStream.getTracks().forEach(track => track.stop());
+        };
+      }
+    } catch (error) {
+      console.error('Photo capture error:', error);
+      toast.error('Failed to capture photo. Please check camera permissions.');
     }
   };
 
@@ -175,7 +326,14 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
+      setRecordedBlob(null);
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleUpload = async () => {
@@ -186,11 +344,12 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
 
     if (!location) {
       toast.error("Location is required. Please enable location access.");
+      requestLocation();
       return;
     }
 
     if (uploadMode !== 'text' && !selectedFile) {
-      toast.error("Please select a file to upload");
+      toast.error("Please select a file or record content");
       return;
     }
 
@@ -215,10 +374,8 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         formData.append('file', selectedFile);
       }
 
-      // Determine the correct endpoint based on upload type
       let endpoint = 'https://backend2.swecha.org/api/v1/content/';
       
-      // You might need to adjust these endpoints based on your actual API
       switch (uploadMode) {
         case 'text':
           endpoint = 'https://backend2.swecha.org/api/v1/content/text/';
@@ -240,7 +397,6 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          // Don't set Content-Type for FormData, let the browser set it
         },
         body: formData,
       });
@@ -264,14 +420,20 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
   };
 
   const handleBack = () => {
+    // Stop any ongoing recording
+    if (isRecording) {
+      stopRecording();
+    }
+    
     setSelectedCategory(null);
     setShowUploadOptions(false);
     setUploadMode(null);
     setTitle('');
     setTextContent('');
     setSelectedFile(null);
-    setLocation(null);
-    setLocationError('');
+    setRecordedBlob(null);
+    setRecordingTime(0);
+    setLocationRequested(false);
   };
 
   if (loading) {
@@ -287,7 +449,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         {/* Header */}
-        <div className="gradient-purple text-white p-6 rounded-b-3xl shadow-xl">
+        <div className="gradient-purple text-white p-4 sm:p-6 rounded-b-3xl shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
@@ -299,11 +461,11 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-2xl font-bold mb-1">
+                <h1 className="text-xl sm:text-2xl font-bold mb-1">
                   {uploadOptions.find(opt => opt.type === uploadMode)?.title}
                 </h1>
-                <p className="text-purple-100">
-                  {selectedCategory.title} • {uploadOptions.find(opt => opt.type === uploadMode)?.description}
+                <p className="text-purple-100 text-sm sm:text-base">
+                  {selectedCategory.title}
                 </p>
               </div>
             </div>
@@ -311,7 +473,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
         </div>
 
         {/* Upload Form */}
-        <div className="px-6 py-8">
+        <div className="px-4 sm:px-6 py-6 sm:py-8">
           <Card className="max-w-2xl mx-auto shadow-lg border-0 rounded-2xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -337,11 +499,11 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               {/* Location Status */}
               <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
                 <MapPin className="h-5 w-5 text-gray-600" />
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-600 flex-1">
                   {location ? (
                     <span className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-green-500" />
-                      Location captured
+                      Location captured ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})
                     </span>
                   ) : locationError ? (
                     <span className="flex items-center gap-2 text-red-600">
@@ -352,20 +514,20 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                     "Requesting location..."
                   )}
                 </span>
-                {!location && !locationError && (
+                {!location && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={requestLocation}
-                    className="ml-auto"
+                    disabled={!locationRequested && location === null}
                   >
-                    Retry Location
+                    {locationRequested ? 'Retry' : 'Get Location'}
                   </Button>
                 )}
               </div>
 
               {/* Content Input based on type */}
-              {uploadMode === 'text' ? (
+              {uploadMode === 'text' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Content *
@@ -377,28 +539,200 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                     placeholder="Enter your text content here..."
                   />
                 </div>
-              ) : (
+              )}
+
+              {uploadMode === 'audio' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    File Upload *
+                    Audio Recording *
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors">
-                    <input
-                      type="file"
-                      accept={uploadOptions.find(opt => opt.type === uploadMode)?.accept}
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="file-upload"
+                  <div className="space-y-4">
+                    {!isRecording && !recordedBlob && (
+                      <Button
+                        onClick={() => startRecording('audio')}
+                        className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg"
+                      >
+                        <Mic className="h-5 w-5 mr-2" />
+                        Start Recording
+                      </Button>
+                    )}
+                    
+                    {isRecording && (
+                      <div className="text-center space-y-4">
+                        <div className="text-2xl font-bold text-red-500">
+                          {formatTime(recordingTime)}
+                        </div>
+                        <Button
+                          onClick={stopRecording}
+                          className="bg-gray-500 hover:bg-gray-600 text-white"
+                        >
+                          <Square className="h-5 w-5 mr-2" />
+                          Stop Recording
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {recordedBlob && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                          <span className="text-sm text-green-700">Recording completed</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setRecordedBlob(null);
+                              setSelectedFile(null);
+                              setRecordingTime(0);
+                            }}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Record Again
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="text-center text-sm text-gray-500">OR</div>
+                    
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        id="audio-upload"
+                      />
+                      <label htmlFor="audio-upload" className="cursor-pointer">
+                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-600">
+                          {selectedFile && !recordedBlob ? selectedFile.name : 'Upload Audio File'}
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {uploadMode === 'video' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Video Recording *
+                  </label>
+                  <div className="space-y-4">
+                    {isRecording && (
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        className="w-full rounded-lg bg-black"
+                        style={{ maxHeight: '300px' }}
+                      />
+                    )}
+                    
+                    {!isRecording && !recordedBlob && (
+                      <Button
+                        onClick={() => startRecording('video')}
+                        className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg"
+                      >
+                        <Video className="h-5 w-5 mr-2" />
+                        Start Video Recording
+                      </Button>
+                    )}
+                    
+                    {isRecording && (
+                      <div className="text-center space-y-4">
+                        <div className="text-2xl font-bold text-red-500">
+                          {formatTime(recordingTime)}
+                        </div>
+                        <Button
+                          onClick={stopRecording}
+                          className="bg-gray-500 hover:bg-gray-600 text-white"
+                        >
+                          <Square className="h-5 w-5 mr-2" />
+                          Stop Recording
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {recordedBlob && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                          <span className="text-sm text-green-700">Video recorded successfully</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setRecordedBlob(null);
+                              setSelectedFile(null);
+                              setRecordingTime(0);
+                            }}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Record Again
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="text-center text-sm text-gray-500">OR</div>
+                    
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        id="video-upload"
+                      />
+                      <label htmlFor="video-upload" className="cursor-pointer">
+                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-600">
+                          {selectedFile && !recordedBlob ? selectedFile.name : 'Upload Video File'}
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {uploadMode === 'image' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Photo Capture *
+                  </label>
+                  <div className="space-y-4">
+                    <video
+                      ref={videoRef}
+                      className="w-full rounded-lg bg-black hidden"
+                      style={{ maxHeight: '300px' }}
                     />
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600 mb-2">
-                        {selectedFile ? selectedFile.name : 'Click to select a file'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {uploadOptions.find(opt => opt.type === uploadMode)?.accept || 'All files'}
-                      </p>
-                    </label>
+                    <canvas ref={canvasRef} className="hidden" />
+                    
+                    <Button
+                      onClick={capturePhoto}
+                      className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg"
+                    >
+                      <Camera className="h-5 w-5 mr-2" />
+                      Capture Photo
+                    </Button>
+                    
+                    <div className="text-center text-sm text-gray-500">OR</div>
+                    
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        id="image-upload"
+                      />
+                      <label htmlFor="image-upload" className="cursor-pointer">
+                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-600">
+                          {selectedFile ? selectedFile.name : 'Upload Image File'}
+                        </p>
+                      </label>
+                    </div>
                   </div>
                 </div>
               )}
@@ -406,7 +740,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               {/* Upload Button */}
               <Button
                 onClick={handleUpload}
-                disabled={uploading || !location}
+                disabled={uploading || !location || (!textContent.trim() && uploadMode === 'text') || (uploadMode !== 'text' && !selectedFile)}
                 className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
               >
                 {uploading ? (
@@ -430,7 +764,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         {/* Header */}
-        <div className="gradient-purple text-white p-6 rounded-b-3xl shadow-xl">
+        <div className="gradient-purple text-white p-4 sm:p-6 rounded-b-3xl shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
@@ -442,168 +776,42 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-3xl font-bold mb-1">Choose Upload Type</h1>
-                <p className="text-purple-100 text-lg">
-                  {selectedCategory.title} • Select content type to upload
+                <h1 className="text-2xl sm:text-3xl font-bold mb-1">Choose Input Method</h1>
+                <p className="text-purple-100 text-sm sm:text-lg">
+                  How would you like to share your content?
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Upload Options */}
-        <div className="px-6 py-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl mx-auto">
-            {uploadOptions.map((option) => (
-              <Card
-                key={option.type}
-                className="cursor-pointer shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105"
-                onClick={() => handleUploadOptionSelect(option)}
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl">
-                      {option.icon}
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-bold text-gray-800">
-                        {option.title}
-                      </CardTitle>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {option.description}
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Main Categories Screen
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="gradient-purple text-white p-6 rounded-b-3xl shadow-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-              onClick={onBack}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold mb-1">Categories</h1>
-              <p className="text-purple-100 text-lg">Select a category to add content</p>
+        {/* Selected Category Display */}
+        <div className="px-4 sm:px-6 py-4">
+          <div className="flex justify-center">
+            <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center gap-3">
+              <div className="p-3 bg-purple-100 rounded-xl">
+                <Check className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Selected Category</p>
+                <p className="font-bold text-purple-600">{selectedCategory.title}</p>
+              </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-              onClick={onProfile}
-            >
-              <User className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
-              onClick={onLogout}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Categories Grid */}
-      <div className="px-6 -mt-4 pb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
-          {categories.map((category) => (
-            <Card 
-              key={category.id} 
-              className="animate-scale-in shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
-              onClick={() => handleCategoryClick(category)}
-            >
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl">
-                    {getCategoryIcon(category.name)}
-                  </div>
-                  <div className="flex-1">
-                    <CardTitle className="text-lg font-bold text-gray-800 mb-1">
-                      {category.title}
-                    </CardTitle>
-                    <div className="flex items-center gap-2 text-xs text-purple-600">
-                      <Grid3X3 className="h-3 w-3" />
-                      <span>Rank {category.rank}</span>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                  {category.description}
-                </p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    <span>{new Date(category.created_at).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    <span>{category.name}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
         </div>
 
-        {categories.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">📂</div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Categories Found</h3>
-            <p className="text-gray-600">Categories will appear here once they are available.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Add custom styles */}
-      <style jsx>{`
-        .gradient-purple {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .animate-scale-in {
-          animation: scaleIn 0.3s ease-out;
-        }
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .line-clamp-3 {
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
-    </div>
-  );
-};
-
-export default Categories;
+        {/* Upload Options Grid */}
+        <div className="px-4 sm:px-6 py-4">
+          <div className="max-w-md mx-auto">
+            <h2 className="text-lg font-bold text-gray-800 mb-4 text-center">
+              Select Input Method
+            </h2>
+            <p className="text-sm text-gray-600 mb-6 text-center">
+              Choose how you want to add your content
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {uploadOptions.map((option) => (
+                <Card
+                  key={option.type}
+                  className="cursor-pointer shadow-lg border-0 rounded-2xl overflow-hidden hover:shadow-xl transition

@@ -89,17 +89,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     return `${local.slice(0, 2)}****@${domain}`;
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white">
-      {/* Header */}
-      <div className="gradient-purple text-white p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20"
-              onClick={onBack}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>

@@ -12,7 +12,7 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [loginMethod, setLoginMethod] = useState<'otp' | 'password'>('otp');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -20,7 +20,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSendOTP = async () => {
-    if (!phoneNumber) {
+    if (!phone) {
       toast.error("Please enter your phone number");
       return;
     }
@@ -33,11 +33,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: phoneNumber
+          phone: phone
         }),
       });
 
       const data = await response.json();
+      console.log('OTP Response:', data);
+      
       if (response.ok) {
         setShowOtpInput(true);
         toast.success("OTP sent successfully!");
@@ -45,6 +47,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         toast.error(data.message || data.detail || "Failed to send OTP");
       }
     } catch (error) {
+      console.error('OTP Error:', error);
       toast.error("Network error. Please try again.");
     }
     setLoading(false);
@@ -64,26 +67,29 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: phoneNumber,
+          phone: phone,
           otp: otp
         }),
       });
 
       const data = await response.json();
+      console.log('OTP Verify Response:', data);
+      
       if (response.ok) {
         toast.success("Login successful!");
-        onLoginSuccess(data.access_token, data.user || { phone: phoneNumber });
+        onLoginSuccess(data.access_token, data.user || { phone: phone });
       } else {
         toast.error(data.message || data.detail || "Invalid OTP");
       }
     } catch (error) {
+      console.error('OTP Verify Error:', error);
       toast.error("Network error. Please try again.");
     }
     setLoading(false);
   };
 
   const handlePasswordLogin = async () => {
-    if (!phoneNumber || !password) {
+    if (!phone || !password) {
       toast.error("Please enter both phone number and password");
       return;
     }
@@ -96,19 +102,22 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: phoneNumber,
+          phone: phone,
           password: password
         }),
       });
 
       const data = await response.json();
+      console.log('Login Response:', data);
+      
       if (response.ok) {
         toast.success("Login successful!");
-        onLoginSuccess(data.access_token, data.user || { phone: phoneNumber });
+        onLoginSuccess(data.access_token, data.user || { phone: phone });
       } else {
         toast.error(data.message || data.detail || "Invalid credentials");
       }
     } catch (error) {
+      console.error('Login Error:', error);
       toast.error("Network error. Please try again.");
     }
     setLoading(false);
@@ -177,8 +186,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 <Input
                   type="tel"
                   placeholder="Enter your phone number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="pl-12 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
                 />
               </div>
@@ -206,7 +215,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               <div className="bg-green-50 p-4 rounded-xl border border-green-200">
                 <p className="text-sm text-green-700 flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  OTP sent to {phoneNumber}
+                  OTP sent to {phone}
                 </p>
               </div>
               
@@ -259,8 +268,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 <Input
                   type="tel"
                   placeholder="Enter your phone number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="pl-12 h-14 border-2 border-gray-200 focus:border-purple-500 rounded-xl text-lg bg-gray-50 focus:bg-white transition-all duration-300"
                 />
               </div>

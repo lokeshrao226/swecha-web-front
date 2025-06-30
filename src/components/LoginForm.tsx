@@ -137,6 +137,23 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     setLoading(false);
   };
 
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-700">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-1/2 -right-1/2 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-1/2 -left-1/2 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
+      </div>
+      
+      <Card className="w-full max-w-md animate-scale-in relative z-10 shadow-2xl border-0 bg-white/95 backdrop-blur-lg">
+        <CardHeader className="text-center pb-8 pt-8">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl shadow-xl overflow-hidden">
+  <img
+    src="/public/favicon.png"
+    alt="Logo"
+    className="w-full h-full object-cover"
+  />
+</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome</h1>
           <p className="text-gray-600">Sign in to your account</p>
         </CardHeader>

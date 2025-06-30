@@ -59,7 +59,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
 
   const fetchUserProfile = async (): Promise<void> => {
     try {
-      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/user', {
+      const response = await fetch('https://backend2.swecha.org/api/v1/user/profile', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -71,8 +71,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
       if (response.ok) {
         const data: UserProfileData = await response.json();
         setProfileData(data);
+      } else if (response.status === 405) {
+        // Method not allowed - try alternative endpoint
+        console.log('Trying alternative profile endpoint...');
+        await fetchUserProfileAlternative();
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch user profile' }));
         setError(errorData.detail || "Failed to fetch user profile");
         toast.error(errorData.detail || "Failed to fetch user profile");
       }
@@ -83,9 +87,38 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     }
   };
 
+  const fetchUserProfileAlternative = async (): Promise<void> => {
+    try {
+      // Try with POST method instead of GET
+      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/user', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+      });
+
+      if (response.ok) {
+        const data: UserProfileData = await response.json();
+        setProfileData(data);
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch user profile' }));
+        setError(errorData.detail || "Failed to fetch user profile");
+        toast.error(errorData.detail || "Failed to fetch user profile");
+      }
+    } catch (error) {
+      console.error('Alternative profile fetch error:', error);
+      setError("Network error. Please try again.");
+      toast.error("Network error. Please try again.");
+    }
+  };
+
   const fetchDailyReports = async (): Promise<void> => {
     try {
-      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
+      // Try GET first
+      let response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -94,11 +127,24 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
         },
       });
 
+      // If GET fails with 405, try POST
+      if (response.status === 405) {
+        response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({})
+        });
+      }
+
       if (response.ok) {
         const data: DailyReportData = await response.json();
         setDailyStats(data);
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch daily statistics' }));
         console.error('Daily stats error:', errorData);
         toast.error(errorData.detail || "Failed to fetch daily statistics");
       }
@@ -113,14 +159,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
   const handleExportData = async (): Promise<void> => {
     setIsExporting(true);
     try {
-      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/export-data?export_format=json', {
+      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/export-data', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: ''
+        body: JSON.stringify({
+          export_format: 'json'
+        })
       });
 
       if (response.ok) {
@@ -129,7 +177,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
         toast.success("Data export initiated successfully");
         console.log('Export Data:', data);
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to export data' }));
         toast.error(errorData.detail || "Failed to export data");
       }
     } catch (error) {
@@ -172,6 +220,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     return username ? username.slice(0, 2).toUpperCase() : 'U';
   };
 
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    fetchUserProfile();
+    fetchDailyReports();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white flex items-center justify-center">
@@ -188,7 +243,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
       <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>Retry</Button>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={handleRetry}>Retry</Button>
+            <Button variant="outline" onClick={onBack}>Go Back</Button>
+          </div>
         </div>
       </div>
     );

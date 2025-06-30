@@ -19,6 +19,8 @@ interface UserProfileData {
   name?: string;
   email?: string;
   phone_number?: string;
+  phone?: string; // Alternative field name
+  mobile?: string; // Alternative field name
   created_at?: string;
   profile_picture?: string;
   location?: string;
@@ -232,17 +234,47 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
     setIsExporting(false);
   };
 
+  // Improved phone number formatting function
   const formatPhoneNumber = (phone: string): string => {
     if (!phone) return '';
     if (showSensitive) return phone;
-    return phone.replace(/(\d{3})\d{6}(\d{2})/, '$1******$2');
+    
+    // Remove any non-digit characters
+    const cleanPhone = phone.replace(/\D/g, '');
+    
+    // Handle different phone number lengths
+    if (cleanPhone.length >= 10) {
+      // For numbers with 10+ digits, mask middle digits
+      if (cleanPhone.length === 10) {
+        // Format: XXX****XXX (for 10-digit numbers)
+        return cleanPhone.replace(/(\d{3})\d{4}(\d{3})/, '$1****$2');
+      } else if (cleanPhone.length > 10) {
+        // For longer numbers (like with country code), show first 3, mask middle, show last 3
+        const start = cleanPhone.slice(0, 3);
+        const end = cleanPhone.slice(-3);
+        const middleLength = cleanPhone.length - 6;
+        return `${start}${'*'.repeat(middleLength)}${end}`;
+      }
+    }
+    
+    // For shorter numbers, mask most of it
+    if (cleanPhone.length >= 6) {
+      return cleanPhone.replace(/(\d{2})\d+(\d{2})/, '$1****$2');
+    }
+    
+    // For very short numbers, just mask with asterisks
+    return '*'.repeat(phone.length);
   };
 
   const formatEmail = (email: string): string => {
     if (!email) return '';
     if (showSensitive) return email;
     const [local, domain] = email.split('@');
-    return `${local.slice(0, 2)}****@${domain}`;
+    if (!local || !domain) return email; // Return original if invalid format
+    
+    // Show first 2 characters of local part, mask rest
+    const maskedLocal = local.length > 2 ? local.slice(0, 2) + '****' : '****';
+    return `${maskedLocal}@${domain}`;
   };
 
   const formatStorageSize = (bytes: number): string => {
@@ -263,6 +295,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     }
     return username ? username.slice(0, 2).toUpperCase() : 'U';
+  };
+
+  // Function to get phone number from various possible field names
+  const getPhoneNumber = (userData: UserProfileData): string => {
+    return userData?.phone_number || userData?.phone || userData?.mobile || '';
   };
 
   const handleRetry = () => {
@@ -300,6 +337,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
   const currentUser = profileData || user;
   const displayName = currentUser?.name || currentUser?.username || 'User';
   const memberSince = currentUser?.created_at ? new Date(currentUser.created_at).getFullYear() : new Date().getFullYear();
+  const userPhone = getPhoneNumber(currentUser);
+  const userEmail = currentUser?.email || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white">
@@ -372,11 +411,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
 
               {/* Contact Information */}
               <div className="w-full space-y-3">
-                {currentUser?.phone_number && (
+                {/* Phone Number Section */}
+                {userPhone && (
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <Phone className="h-5 w-5 text-purple-500" />
-                      <span className="font-medium">{formatPhoneNumber(currentUser.phone_number)}</span>
+                      <span className="font-medium">{formatPhoneNumber(userPhone)}</span>
                     </div>
                     <Button
                       variant="ghost"
@@ -388,11 +428,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
                   </div>
                 )}
 
-                {currentUser?.email && (
+                {/* Email Section */}
+                {userEmail && (
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <Mail className="h-5 w-5 text-purple-500" />
-                      <span className="font-medium">{formatEmail(currentUser.email)}</span>
+                      <span className="font-medium">{formatEmail(userEmail)}</span>
                     </div>
                     <Button
                       variant="ghost"
@@ -423,7 +464,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
                 </div>
               </div>
 
-              {(currentUser?.phone_number || currentUser?.email) && (
+              {/* Show hint only if there's sensitive information */}
+              {(userPhone || userEmail) && (
                 <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
                   Tap the eye icon to reveal sensitive information
                 </p>

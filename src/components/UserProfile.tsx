@@ -53,137 +53,182 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, token, onLogout, onBack
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUserProfile();
-    fetchDailyReports();
+    const loadProfileData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      await fetchUserProfile();
+      await fetchDailyReports();
+      
+      setIsLoading(false);
+    };
+
+    loadProfileData();
   }, [token]);
 
   const fetchUserProfile = async (): Promise<void> => {
-    try {
-      const response = await fetch('https://backend2.swecha.org/api/v1/user/profile', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
+    const endpoints = [
+      'https://backend2.swecha.org/api/v1/user/me',
+      'https://backend2.swecha.org/api/v1/users/me', 
+      'https://backend2.swecha.org/api/v1/user/profile',
+      'https://backend2.swecha.org/api/v1/users/profile',
+      'https://backend2.swecha.org/api/v1/auth/me'
+    ];
 
-      if (response.ok) {
-        const data: UserProfileData = await response.json();
-        setProfileData(data);
-      } else if (response.status === 405) {
-        // Method not allowed - try alternative endpoint
-        console.log('Trying alternative profile endpoint...');
-        await fetchUserProfileAlternative();
-      } else {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch user profile' }));
-        setError(errorData.detail || "Failed to fetch user profile");
-        toast.error(errorData.detail || "Failed to fetch user profile");
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`);
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data: UserProfileData = await response.json();
+          console.log('Profile data received:', data);
+          setProfileData(data);
+          return; // Success, exit the loop
+        } else if (response.status === 404) {
+          console.log(`Endpoint ${endpoint} not found, trying next...`);
+          continue; // Try next endpoint
+        } else {
+          const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+          console.log(`Endpoint ${endpoint} failed:`, errorData);
+        }
+      } catch (error) {
+        console.error(`Error with endpoint ${endpoint}:`, error);
+        continue; // Try next endpoint
       }
-    } catch (error) {
-      console.error('Profile fetch error:', error);
-      setError("Network error. Please try again.");
-      toast.error("Network error. Please try again.");
     }
-  };
 
-  const fetchUserProfileAlternative = async (): Promise<void> => {
-    try {
-      // Try with POST method instead of GET
-      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/user', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({})
-      });
-
-      if (response.ok) {
-        const data: UserProfileData = await response.json();
-        setProfileData(data);
-      } else {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch user profile' }));
-        setError(errorData.detail || "Failed to fetch user profile");
-        toast.error(errorData.detail || "Failed to fetch user profile");
-      }
-    } catch (error) {
-      console.error('Alternative profile fetch error:', error);
-      setError("Network error. Please try again.");
-      toast.error("Network error. Please try again.");
-    }
+    // If all endpoints failed, set error
+    setError("Unable to fetch user profile. Please check API endpoints.");
+    toast.error("Unable to fetch user profile");
   };
 
   const fetchDailyReports = async (): Promise<void> => {
-    try {
-      // Try GET first
-      let response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
+    const endpoints = [
+      { url: 'https://backend2.swecha.org/api/v1/user/contributions', method: 'GET' },
+      { url: 'https://backend2.swecha.org/api/v1/users/contributions', method: 'GET' },
+      { url: 'https://backend2.swecha.org/api/v1/user/stats', method: 'GET' },
+      { url: 'https://backend2.swecha.org/api/v1/users/stats', method: 'GET' },
+      { url: 'https://backend2.swecha.org/api/v1/tasks/reports/daily', method: 'GET' },
+      { url: 'https://backend2.swecha.org/api/v1/tasks/reports/daily', method: 'POST' },
+      { url: 'https://backend2.swecha.org/api/v1/user/dashboard', method: 'GET' },
+      { url: 'https://backend2.swecha.org/api/v1/users/dashboard', method: 'GET' }
+    ];
 
-      // If GET fails with 405, try POST
-      if (response.status === 405) {
-        response = await fetch('https://backend2.swecha.org/api/v1/tasks/reports/daily', {
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying stats endpoint: ${endpoint.url} with ${endpoint.method}`);
+        const requestOptions: RequestInit = {
+          method: endpoint.method,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        };
+
+        if (endpoint.method === 'POST') {
+          requestOptions.body = JSON.stringify({});
+        }
+
+        const response = await fetch(endpoint.url, requestOptions);
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Stats data received:', data);
+          
+          // Map the response to our expected format
+          const mappedData: DailyReportData = {
+            total_uploads: data.total_uploads || data.total_contributions || data.uploads || 0,
+            videos_uploaded: data.videos_uploaded || data.video_count || data.videos || 0,
+            images_uploaded: data.images_uploaded || data.image_count || data.images || 0,
+            audio_uploaded: data.audio_uploaded || data.audio_count || data.audio || 0,
+            storage_used: data.storage_used || data.storage || 0,
+            last_upload_date: data.last_upload_date || data.last_contribution || data.last_upload,
+            active_days: data.active_days || data.days_active || 0,
+            ...data
+          };
+          
+          setDailyStats(mappedData);
+          return; // Success, exit the loop
+        } else if (response.status === 404) {
+          console.log(`Endpoint ${endpoint.url} not found, trying next...`);
+          continue;
+        } else {
+          const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+          console.log(`Endpoint ${endpoint.url} failed:`, errorData);
+        }
+      } catch (error) {
+        console.error(`Error with endpoint ${endpoint.url}:`, error);
+        continue;
+      }
+    }
+
+    console.log('All stats endpoints failed, using default values');
+    // If all endpoints failed, set default values
+    setDailyStats({
+      total_uploads: 0,
+      videos_uploaded: 0,
+      images_uploaded: 0,
+      audio_uploaded: 0,
+      storage_used: 0,
+      active_days: 0
+    });
+  };
+
+  const handleExportData = async (): Promise<void> => {
+    setIsExporting(true);
+    const endpoints = [
+      'https://backend2.swecha.org/api/v1/user/export',
+      'https://backend2.swecha.org/api/v1/users/export',
+      'https://backend2.swecha.org/api/v1/tasks/export-data',
+      'https://backend2.swecha.org/api/v1/export/user-data'
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying export endpoint: ${endpoint}`);
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json',
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({})
+          body: JSON.stringify({
+            export_format: 'json',
+            format: 'json'
+          })
         });
-      }
 
-      if (response.ok) {
-        const data: DailyReportData = await response.json();
-        setDailyStats(data);
-      } else {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch daily statistics' }));
-        console.error('Daily stats error:', errorData);
-        toast.error(errorData.detail || "Failed to fetch daily statistics");
+        if (response.ok) {
+          const data: UserData = await response.json();
+          setExportData(data);
+          toast.success("Data export initiated successfully");
+          console.log('Export Data:', data);
+          setIsExporting(false);
+          return;
+        } else if (response.status === 404) {
+          console.log(`Export endpoint ${endpoint} not found, trying next...`);
+          continue;
+        } else {
+          const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+          console.log(`Export endpoint ${endpoint} failed:`, errorData);
+        }
+      } catch (error) {
+        console.error(`Error with export endpoint ${endpoint}:`, error);
+        continue;
       }
-    } catch (error) {
-      console.error('Daily stats fetch error:', error);
-      toast.error("Failed to fetch daily statistics");
-    } finally {
-      setIsLoading(false);
     }
-  };
 
-  const handleExportData = async (): Promise<void> => {
-    setIsExporting(true);
-    try {
-      const response = await fetch('https://backend2.swecha.org/api/v1/tasks/export-data', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          export_format: 'json'
-        })
-      });
-
-      if (response.ok) {
-        const data: UserData = await response.json();
-        setExportData(data);
-        toast.success("Data export initiated successfully");
-        console.log('Export Data:', data);
-      } else {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to export data' }));
-        toast.error(errorData.detail || "Failed to export data");
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      toast.error("Network error. Please try again.");
-    }
+    toast.error("Data export feature is not available");
     setIsExporting(false);
   };
 

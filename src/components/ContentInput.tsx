@@ -277,21 +277,7 @@ const ContentInput: React.FC<ContentInputProps> = ({ token, onBack, categoryId, 
     setIsSubmitting(false);
   };
 
-  if (!inputMethod) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white border-b p-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onBack}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">Choose Input Method</h1>
-              <p className="text-sm text-gray-600">How would you like to share your content?</p>
-            </div>
-          </div>
-        </div>
+  
 
         <div className="p-6 space-y-6">
           {/* Selected Category */}

@@ -6,7 +6,8 @@ import ContentInput from '@/components/ContentInput';
 import Categories from '@/components/Categories';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, User, Home, Activity, Grid3X3 } from 'lucide-react';
+import { Plus, User, Home, Activity, Grid3X3, Globe } from 'lucide-react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type View = 'login' | 'home' | 'profile' | 'content' | 'categories';
 
@@ -14,6 +15,7 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<View>('login');
   const [user, setUser] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
+  const { language, toggleLanguage, t } = useLanguage();
 
   useEffect(() => {
     // Check for existing session on load
@@ -44,7 +46,22 @@ const Index = () => {
   };
 
   if (currentView === 'login') {
-    return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <div className="relative">
+        <div className="absolute top-4 right-4 z-10">
+          <Button
+            onClick={toggleLanguage}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Globe className="h-4 w-4" />
+            {language === 'en' ? 'తె' : 'EN'}
+          </Button>
+        </div>
+        <LoginForm onLoginSuccess={handleLoginSuccess} />
+      </div>
+    );
   }
 
   if (currentView === 'profile') {
@@ -86,19 +103,30 @@ const Index = () => {
       <div className="gradient-purple text-white p-6 rounded-b-3xl shadow-xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-1">Welcome Back!</h1>
+            <h1 className="text-3xl font-bold mb-1">{t('welcome_back')}</h1>
             <p className="text-purple-100 text-lg">
-              {user?.name || user?.username || 'User'}
+              {user?.name || user?.username || t('user')}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/20 w-12 h-12 rounded-full"
-            onClick={() => setCurrentView('profile')}
-          >
-            <User className="h-6 w-6" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={toggleLanguage}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 rounded-full"
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              {language === 'en' ? 'తె' : 'EN'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 w-12 h-12 rounded-full"
+              onClick={() => setCurrentView('profile')}
+            >
+              <User className="h-6 w-6" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -106,21 +134,21 @@ const Index = () => {
         {/* Quick Actions */}
         <Card className="animate-scale-in mb-6 shadow-lg border-0 rounded-2xl overflow-hidden">
           <CardContent className="p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-6">Quick Actions</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-6">{t('quick_actions')}</h2>
             <div className="grid grid-cols-2 gap-4">
               <Button
                 onClick={() => setCurrentView('categories')}
                 className="h-24 flex-col gap-3 gradient-purple text-white hover:opacity-90 rounded-xl shadow-lg border-0 transition-all duration-300 hover:scale-105"
               >
                 <Grid3X3 className="h-7 w-7" />
-                <span className="font-semibold">Categories</span>
+                <span className="font-semibold">{t('categories')}</span>
               </Button>
               <Button
                 onClick={() => setCurrentView('content')}
                 className="h-24 flex-col gap-3 gradient-purple text-white hover:opacity-90 rounded-xl shadow-lg border-0 transition-all duration-300 hover:scale-105"
               >
                 <Plus className="h-7 w-7" />
-                <span className="font-semibold">Add Content</span>
+                <span className="font-semibold">{t('add_content')}</span>
               </Button>
             </div>
           </CardContent>
@@ -133,15 +161,15 @@ const Index = () => {
               <div className="w-10 h-10 gradient-purple rounded-full flex items-center justify-center">
                 <Activity className="h-5 w-5 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-800">Recent Activity</h2>
+              <h2 className="text-xl font-bold text-gray-800">{t('recent_activity')}</h2>
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-100">
                 <div>
-                  <p className="font-semibold text-gray-800">Welcome to the platform!</p>
-                  <p className="text-sm text-gray-600 mt-1">Get started by exploring categories</p>
+                  <p className="font-semibold text-gray-800">{t('welcome_to_platform')}</p>
+                  <p className="text-sm text-gray-600 mt-1">{t('get_started_exploring')}</p>
                 </div>
-                <span className="text-xs text-purple-600 font-medium bg-purple-100 px-2 py-1 rounded-full">Now</span>
+                <span className="text-xs text-purple-600 font-medium bg-purple-100 px-2 py-1 rounded-full">{t('now')}</span>
               </div>
             </div>
           </CardContent>

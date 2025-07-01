@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, LogOut, Grid3X3, Calendar, User, FileText, Upload, MapPin, Type, Mic, Video, Image, X, Check, AlertCircle, Camera, Square, Play, Pause, RotateCcw } from 'lucide-react';
+import { ArrowLeft, LogOut, Grid3X3, Calendar, User, FileText, Upload, MapPin, Type, Mic, Video, Image, X, Check, AlertCircle, Camera, Square, Play, Pause, RotateCcw, Globe } from 'lucide-react';
 import { toast } from "sonner";
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface Category {
   id: string;
@@ -32,6 +33,7 @@ interface UploadOption {
 }
 
 const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProfile, onContentInput }) => {
+  const { language, toggleLanguage, t } = useLanguage();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -65,29 +67,29 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
     {
       type: 'text',
       icon: <Type className="h-8 w-8" />,
-      title: 'Text Input',
-      description: 'Type your content',
+      title: t('text_input'),
+      description: t('enter_content'),
       accept: ''
     },
     {
       type: 'audio',
       icon: <Mic className="h-8 w-8" />,
-      title: 'Audio Recording',
-      description: 'Record your voice',
+      title: t('audio_input'),
+      description: t('upload_audio'),
       accept: 'audio/*'
     },
     {
       type: 'video',
       icon: <Video className="h-8 w-8" />,
-      title: 'Video Content',
-      description: 'Record or upload video',
+      title: t('video_input'),
+      description: t('upload_video'),
       accept: 'video/*'
     },
     {
       type: 'image',
       icon: <Camera className="h-8 w-8" />,
-      title: 'Photo Capture',
-      description: 'Take or upload photos',
+      title: t('image_input'),
+      description: t('upload_image'),
       accept: 'image/*'
     }
   ];
@@ -532,6 +534,15 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                 </p>
               </div>
             </div>
+            <Button
+              onClick={toggleLanguage}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 rounded-full"
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              {language === 'en' ? 'తె' : 'EN'}
+            </Button>
           </div>
         </div>
 
@@ -541,21 +552,21 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 {uploadOptions.find(opt => opt.type === uploadMode)?.icon}
-                Upload Content
+                {t('add_content')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Title Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Title *
+                  {t('enter_content')} *
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Enter a title for your content"
+                  placeholder={t('enter_content')}
                 />
               </div>
 
@@ -650,7 +661,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               {uploadMode === 'text' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Content *
+                    {t('enter_content')} *
                   </label>
                   <textarea
                     value={textContent}
@@ -664,7 +675,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               {uploadMode === 'audio' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Audio Recording *
+                    {t('upload_audio')} *
                   </label>
                   <div className="space-y-4">
                     {!isRecording && !recordedBlob && (
@@ -673,7 +684,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                         className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg"
                       >
                         <Mic className="h-5 w-5 mr-2" />
-                        Start Recording
+                        {t('start_recording')}
                       </Button>
                     )}
                     
@@ -690,7 +701,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                           className="bg-gray-500 hover:bg-gray-600 text-white"
                         >
                           <Square className="h-5 w-5 mr-2" />
-                          Stop Recording
+                          {t('stop_recording')}
                         </Button>
                       </div>
                     )}
@@ -706,7 +717,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                               onClick={resetRecording}
                             >
                               <RotateCcw className="h-4 w-4 mr-1" />
-                              Record Again
+                              {t('record_again')}
                             </Button>
                           </div>
                           <audio controls className="w-full">
@@ -741,7 +752,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               {uploadMode === 'video' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Video Recording *
+                    {t('upload_video')} *
                   </label>
                   <div className="space-y-4">
                     {isRecording && (
@@ -760,7 +771,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                         className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg"
                       >
                         <Video className="h-5 w-5 mr-2" />
-                        Start Video Recording
+                        {t('start_recording')}
                       </Button>
                     )}
                     
@@ -777,7 +788,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                           className="bg-gray-500 hover:bg-gray-600 text-white"
                         >
                           <Square className="h-5 w-5 mr-2" />
-                          Stop Recording
+                          {t('stop_recording')}
                         </Button>
                       </div>
                     )}
@@ -793,7 +804,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                               onClick={resetRecording}
                             >
                               <RotateCcw className="h-4 w-4 mr-1" />
-                              Record Again
+                              {t('record_again')}
                             </Button>
                           </div>
                           <video controls className="w-full rounded-lg" style={{ maxHeight: '300px' }}>
@@ -828,7 +839,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               {uploadMode === 'image' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Image Capture *
+                    {t('upload_image')} *
                   </label>
                   <div className="space-y-4">
                     <Button
@@ -836,7 +847,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                       className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg"
                     >
                       <Camera className="h-5 w-5 mr-2" />
-                      Capture Photo
+                      {t('capture_photo')}
                     </Button>
                     
                     <div className="text-center text-sm text-gray-500">OR</div>
@@ -885,12 +896,14 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
                 {uploading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Uploading...
+                    {t('submitting')}
                   </>
                 ) : (
                   <>
                     <Upload className="h-5 w-5 mr-2" />
-                    Upload Content
+                    {uploadMode === 'text' ? t('submit_content') : 
+                     uploadMode === 'audio' ? t('submit_audio') :
+                     uploadMode === 'video' ? t('submit_video') : t('submit_image')}
                   </>
                 )}
               </Button>
@@ -919,13 +932,22 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               </Button>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold mb-1">
-                  Select Content Type
+                  {t('choose_input_method')}
                 </h1>
                 <p className="text-purple-100 text-sm sm:text-base">
                   {selectedCategory.title}
                 </p>
               </div>
             </div>
+            <Button
+              onClick={toggleLanguage}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 rounded-full"
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              {language === 'en' ? 'తె' : 'EN'}
+            </Button>
           </div>
         </div>
 
@@ -976,20 +998,29 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
             </Button>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold mb-1">
-                Choose Category
+                {t('select_category')}
               </h1>
               <p className="text-purple-100 text-sm sm:text-base">
-                Select a category to share your content
+                {t('explore_categories')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
+              onClick={toggleLanguage}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 rounded-full"
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              {language === 'en' ? 'తె' : 'EN'}
+            </Button>
+            <Button
               variant="ghost"
               size="icon"
               className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
               onClick={onProfile}
-              title="Profile"
+              title={t('profile')}
             >
               <User className="h-5 w-5" />
             </Button>
@@ -998,7 +1029,7 @@ const Categories: React.FC<CategoriesProps> = ({ token, onBack, onLogout, onProf
               size="icon"
               className="text-white hover:bg-white/20 w-10 h-10 rounded-full"
               onClick={onLogout}
-              title="Logout"
+              title={t('logout')}
             >
               <LogOut className="h-5 w-5" />
             </Button>
